@@ -1,0 +1,46 @@
+# Database Configuration
+database:
+  # For MVP, we use SQLite. For production, this could be a PostgreSQL connection string.
+  url: "sqlite:///kyna.db"
+
+# Qdrant Vector Store Configuration
+qdrant:
+  host: "${QDRANT_HOST:localhost}"
+  port: ${QDRANT_PORT:6333}
+  collection_name: "kyna_faq"
+
+# Embedding Model Configuration
+embedding:
+  # provider can be 'openai' or 'fastembed'
+  provider: "fastembed"
+  # The model name corresponding to the selected provider.
+  model: "BAAI/bge-small-en-v1.5"
+
+# LLM Provider Configuration (using LiteLLM)
+llm:
+  # The model string that LiteLLM will use to call the correct provider.
+  # Examples: "gpt-3.5-turbo", "openrouter/google/gemini-pro", "groq/llama3-70b-8192"
+  model: "gpt-3.5-turbo"
+  # API keys are loaded automatically by LiteLLM from environment variables (e.g., OPENAI_API_KEY, OPENROUTER_API_KEY).
+
+# Data Ingestion Configuration (Handled by API logic)
+ingestion:
+  chunk_size: 1000
+  chunk_overlap: 100
+
+# RAG Chain Configuration
+rag:
+  retriever:
+    # search_type can be 'similarity' or 'similarity_score_threshold'
+    search_type: "similarity_score_threshold"
+    search_k: 4
+    score_threshold: 0.7
+  prompt_template: "Use the following pieces of context to answer the user's question. If you don't know the answer, just say that you don't know, don't try to make up an answer.\n\nContext:\n{context}\n\nQuestion:\n{question}\n\nHelpful Answer:"
+
+# Conversational Memory Configuration
+memory:
+  # Time-to-live in seconds. Session data will be purged after this period of inactivity.
+  ttl_seconds: 3600
+  # Maximum number of messages to keep in history (e.g., 5 user + 5 AI = 10).
+  # This prevents the memory buffer from growing indefinitely.
+  max_history_length: 10
