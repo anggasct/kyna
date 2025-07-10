@@ -2,15 +2,15 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from kyna.core.db import db_manager
-from kyna.api.endpoints import ask, documents
+from kyna.core.logging_config import setup_logging
+from kyna.api.endpoints import ask, documents, files
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI lifespan handler."""
-    # Startup
+    setup_logging(level="INFO", format_type="detailed")
     db_manager.create_tables()
     yield
-    # Shutdown
+
 
 app = FastAPI(
     title="Kyna FAQ Assistant",
@@ -30,11 +30,11 @@ app.add_middleware(
 
 # Include routers
 app.include_router(ask.router, prefix="/api", tags=["ask"])
-app.include_router(documents.router, prefix="/api", tags=["documents"])
+app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+app.include_router(files.router, prefix="/files", tags=["files"])
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "message": "Kyna FAQ Assistant API",
         "version": "1.0.0",
@@ -43,5 +43,4 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
     return {"status": "healthy"}

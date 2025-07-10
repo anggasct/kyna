@@ -2,7 +2,7 @@ services:
   # PostgreSQL database
   postgres:
     image: postgres:15
-    container_name: kyna-postgres
+    container_name: kyna-postgres-debug
     restart: unless-stopped
     environment:
       - POSTGRES_DB=kyna
@@ -18,7 +18,7 @@ services:
   # Qdrant vector database
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: kyna-qdrant
+    container_name: kyna-qdrant-debug
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -30,50 +30,59 @@ services:
     networks:
       - kyna-network
 
-  # Kyna API Backend
+  # Kyna API Backend with Debug Support
   kyna-api:
     build:
       context: .
-      dockerfile: Dockerfile.api
-    container_name: kyna-api
+      dockerfile: Dockerfile.api.debug
+    container_name: kyna-api-debug
     ports:
       - "8000:8000"
+      - "5678:5678"  # Debug port
     depends_on:
       - postgres
       - qdrant
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
+      - PYTHONPATH=/app
+      - FASTEMBED_CACHE_PATH=/tmp/fastembed_cache
     env_file:
       - .env
     volumes:
+      - .:/app  # Mount source code for hot reload
       - ./data:/app/data
       - ./config:/app/config
+      - fastembed_cache:/tmp/fastembed_cache  # Persist FastEmbed model cache
     networks:
       - kyna-network
-    command: uvicorn kyna.api.main:app --host 0.0.0.0 --port 8000
+    command: python -m debugpy --listen 0.0.0.0:5678 -m uvicorn kyna.api.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Kyna Streamlit Playground
+  # Kyna Streamlit Playground with Debug Support
   kyna-playground:
     build:
       context: .
-      dockerfile: Dockerfile.playground
-    container_name: kyna-playground
+      dockerfile: Dockerfile.playground.debug
+    container_name: kyna-playground-debug
     ports:
       - "8501:8501"
+      - "5679:5679"  # Debug port
     depends_on:
       - kyna-api
     environment:
-      - API_BASE_URL=http://kyna-api:8000/api
+      - API_BASE_URL=http://kyna-api-debug:8000/api
+      - PYTHONPATH=/app
     volumes:
+      - .:/app  # Mount source code for hot reload
       - ./config:/app/config
     networks:
       - kyna-network
-    command: streamlit run kyna/playground/app.py --server.port=8501 --server.address=0.0.0.0
+    command: python -m debugpy --listen 0.0.0.0:5679 -m streamlit run kyna/playground/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   postgres_data:
   qdrant_data:
+  fastembed_cache:
 
 networks:
   kyna-network:

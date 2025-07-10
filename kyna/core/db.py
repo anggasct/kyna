@@ -1,3 +1,18 @@
+"""
+Database Module - Manages database connection and sessions.
+
+This module provides the core functionality for interacting with the relational
+database, including creating the engine, managing sessions, and creating tables.
+
+Key components:
+- `DatabaseManager`: Handles database connection and session management.
+- `get_db`: Dependency for FastAPI to provide a database session.
+
+Integration:
+- Used by `api` endpoints to get database sessions.
+- Used by `document_processor` and `document_manager` for data persistence.
+- Uses `config` for database connection URL.
+"""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from .config import get_config
@@ -5,6 +20,7 @@ from .config import get_config
 Base = declarative_base()
 
 class DatabaseManager:
+    """Manages database connections and operations."""
     def __init__(self):
         self.config = get_config()
         self.engine = create_engine(

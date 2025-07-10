@@ -1,0 +1,32 @@
+FROM python:3.9-slim AS base
+
+WORKDIR /app
+
+# Install system dependencies and clean up in same layer
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies with cache for faster rebuilds
+RUN pip install -r requirements.txt
+
+# Development stage
+FROM base AS development
+
+# Copy only essential files for debug
+COPY kyna/ ./kyna/
+COPY config/ ./config/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
+
+# Expose ports
+EXPOSE 8000 5678
+
+# Run the application with debugpy
+CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "kyna.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

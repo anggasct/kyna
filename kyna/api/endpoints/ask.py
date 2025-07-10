@@ -29,15 +29,6 @@ async def ask_question(
     request: QuestionRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Ask a question to the FAQ assistant.
-    
-    - **question**: The user's question
-    - **session_id**: Optional session ID for conversational memory
-    
-    If session_id is provided, the system will maintain conversational context.
-    If omitted, each question is treated as a standalone query.
-    """
     try:
         rag_chain = get_rag_chain()
         
@@ -67,11 +58,6 @@ async def ask_question(
 
 @router.get("/sessions/{session_id}/history", response_model=SessionHistoryResponse)
 async def get_session_history(session_id: str):
-    """
-    Get conversation history for a session.
-    
-    - **session_id**: The session ID to retrieve history for
-    """
     try:
         rag_chain = get_rag_chain()
         history = rag_chain.get_session_history(session_id)
@@ -89,11 +75,6 @@ async def get_session_history(session_id: str):
 
 @router.delete("/sessions/{session_id}")
 async def clear_session(session_id: str):
-    """
-    Clear a conversation session.
-    
-    - **session_id**: The session ID to clear
-    """
     try:
         rag_chain = get_rag_chain()
         success = rag_chain.clear_session(session_id)

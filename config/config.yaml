@@ -1,7 +1,7 @@
 # Database Configuration
 database:
-  # For MVP, we use SQLite. For production, this could be a PostgreSQL connection string.
-  url: "sqlite:///kyna.db"
+  # PostgreSQL is the default database for production readiness
+  url: "${DATABASE_URL:postgresql://kyna:kyna@localhost:5432/kyna}"
 
 # Qdrant Vector Store Configuration
 qdrant:
@@ -11,9 +11,12 @@ qdrant:
 
 # Embedding Model Configuration
 embedding:
-  # provider can be 'openai' or 'fastembed'
+  # provider can be 'openai', 'fastembed', or 'sentence_transformers'
   provider: "fastembed"
   # The model name corresponding to the selected provider.
+  # FastEmbed models: "BAAI/bge-small-en-v1.5", "BAAI/bge-base-en-v1.5", "BAAI/bge-large-en-v1.5"
+  # Sentence Transformers models: "all-MiniLM-L6-v2", "all-mpnet-base-v2", "paraphrase-multilingual-MiniLM-L12-v2"
+  # OpenAI models: "text-embedding-3-small", "text-embedding-3-large"
   model: "BAAI/bge-small-en-v1.5"
 
 # LLM Provider Configuration (using LiteLLM)
@@ -25,17 +28,18 @@ llm:
 
 # Data Ingestion Configuration (Handled by API logic)
 ingestion:
-  chunk_size: 1000
-  chunk_overlap: 100
+  chunk_size: 1200
+  chunk_overlap: 200
 
 # RAG Chain Configuration
 rag:
   retriever:
     # search_type can be 'similarity' or 'similarity_score_threshold'
-    search_type: "similarity_score_threshold"
-    search_k: 4
-    score_threshold: 0.7
-  prompt_template: "Use the following pieces of context to answer the user's question. If you don't know the answer, just say that you don't know, don't try to make up an answer.\n\nContext:\n{context}\n\nQuestion:\n{question}\n\nHelpful Answer:"
+    search_type: "similarity"
+    search_k: 10
+    score_threshold: 0.2
+  # Prompt template - can be file path or inline template
+  prompt_template: "config/prompts/prompt.md"
 
 # Conversational Memory Configuration
 memory:

@@ -1,6 +1,8 @@
-# Kyna - AI FAQ Assistant
+# Kyna - AI Knowledge Assistant
 
-Kyna is an AI-powered FAQ assistant built using a RAG (Retrieval-Augmented Generation) pipeline with LangChain. The system provides intelligent answers to user questions by combining document retrieval with large language models.
+**K**now **Y**our **N**ext **A**nswer
+
+Kyna is an AI-powered knowledge assistant built using a RAG (Retrieval-Augmented Generation) pipeline with LangChain. The system provides intelligent answers to user questions by retrieving relevant information from your knowledge base and combining it with large language models.
 
 ## Features
 
@@ -12,6 +14,8 @@ Kyna is an AI-powered FAQ assistant built using a RAG (Retrieval-Augmented Gener
 - **Web Interface**: Streamlit-based playground for easy interaction
 - **Vector Storage**: Uses Qdrant for efficient similarity search
 - **Configurable**: YAML-based configuration for easy customization
+- **Docker Support**: Full containerization with production and debug modes
+- **Database Management**: Comprehensive backup and restore capabilities
 
 ## Architecture
 
@@ -23,6 +27,7 @@ The system follows a modular architecture:
 - **Database**: SQLAlchemy with SQLite (MVP) for metadata
 - **UI**: Streamlit playground
 - **Configuration**: YAML config files with environment variables
+- **Containerization**: Docker with production and debug configurations
 
 ## Quick Start
 
@@ -45,14 +50,37 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-3. Start the application with Docker Compose:
+3. Start the application:
 ```bash
+# Build and start production containers
+make build
+make up
+
+# Or use Docker Compose directly
 docker-compose up --build
 ```
 
 4. Open your browser to:
    - `http://localhost:8501` for the Streamlit playground
    - `http://localhost:8000/docs` for the API documentation
+   - `http://localhost:6333/dashboard` for the Qdrant dashboard
+
+### Debug Mode
+
+For development with debugging support:
+
+```bash
+# Build and start debug containers
+make build-debug
+make up-debug
+
+# Or use Docker Compose directly
+docker-compose -f docker-compose.debug.yml up --build
+```
+
+Debug ports:
+- API Debug: `localhost:5678`
+- Playground Debug: `localhost:5679`
 
 ### Manual Installation (Alternative)
 
@@ -92,38 +120,106 @@ The system is configured via `config/config.yaml`:
 database:
   url: "sqlite:///kyna.db"
 
-# Qdrant Vector Store
+# Qdrant Vector Store Configuration
 qdrant:
-  host: "localhost"
-  port: 6333
+  host: "${QDRANT_HOST:localhost}"
+  port: ${QDRANT_PORT:6333}
   collection_name: "kyna_faq"
 
-# Embedding Configuration
+# Embedding Model Configuration
 embedding:
   provider: "fastembed"  # or "openai"
   model: "BAAI/bge-small-en-v1.5"
 
-# LLM Configuration
+# LLM Provider Configuration (using LiteLLM)
 llm:
-  model: "gpt-3.5-turbo"
+  model: "gpt-3.5-turbo"  # or "openrouter/google/gemini-pro", "groq/llama3-70b-8192"
 
-# RAG Settings
+# Data Ingestion Configuration
+ingestion:
+  chunk_size: 1200
+  chunk_overlap: 200
+
+# RAG Chain Configuration
 rag:
   retriever:
-    search_type: "similarity_score_threshold"
-    search_k: 4
-    score_threshold: 0.7
-  prompt_template: "Use the following pieces of context..."
+    search_type: "similarity"  # or "similarity_score_threshold"
+    search_k: 10
+    score_threshold: 0.2
+  prompt_template: "config/prompts/prompt.md"
 
-# Memory Settings
+# Conversational Memory Configuration
 memory:
   ttl_seconds: 3600
   max_history_length: 10
 ```
 
+### Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```bash
+# Required: OpenAI API Key
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Optional: Other LLM Provider Keys
+OPENROUTER_API_KEY=sk-or-your-openrouter-api-key-here
+GROQ_API_KEY=your-groq-api-key-here
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+
+# Optional: Qdrant Cloud Configuration
+QDRANT_URL=https://your-qdrant-instance.com
+QDRANT_API_KEY=your-qdrant-api-key-here
+```
+
+## Makefile Commands
+
+The project includes a comprehensive Makefile for Docker management:
+
+### Production Commands
+
+```bash
+make help           # Show all available commands
+make build          # Build production containers
+make up             # Start production containers
+make down           # Stop production containers
+make logs           # View production logs
+make restart        # Restart production containers
+```
+
+### Debug Commands
+
+```bash
+make build-debug    # Build debug containers
+make up-debug       # Start debug containers
+make down-debug     # Stop debug containers
+make logs-debug     # View debug logs
+make restart-debug  # Restart debug containers
+```
+
+### Database Management
+
+```bash
+make db-reset       # Reset all database data (with confirmation)
+make db-backup      # Backup Qdrant and SQLite databases
+make db-restore     # Restore from backup (specify BACKUP_TIMESTAMP)
+make db-reset-force # Force reset without confirmation
+```
+
+### Utility Commands
+
+```bash
+make status         # Show container status
+make clean          # Clean containers and volumes
+make clean-images   # Remove all Kyna images
+make clean-volumes  # Remove all volumes
+make init           # Initialize project
+```
+
 ## API Endpoints
 
 ### Ask Question
+
 ```bash
 POST /api/ask
 {
@@ -133,6 +229,7 @@ POST /api/ask
 ```
 
 ### Document Management
+
 ```bash
 # Upload document
 POST /api/documents/upload
@@ -143,64 +240,17 @@ GET /api/documents
 
 # Delete document
 DELETE /api/documents/{doc_id}
-
-# Get document details
-GET /api/documents/{doc_id}
 ```
 
-### Session Management
-```bash
-# Get session history
-GET /api/sessions/{session_id}/history
-
-# Clear session
-DELETE /api/sessions/{session_id}
-```
-
-## Usage Examples
-
-### Basic Question (Stateless)
-```python
-import requests
-
-response = requests.post("http://localhost:8000/api/ask", json={
-    "question": "What are your business hours?"
-})
-print(response.json()["answer"])
-```
-
-### Conversational Question (Stateful)
-```python
-import requests
-
-# First question
-response1 = requests.post("http://localhost:8000/api/ask", json={
-    "question": "What is your return policy?",
-    "session_id": "user-123"
-})
-
-# Follow-up question with context
-response2 = requests.post("http://localhost:8000/api/ask", json={
-    "question": "How long does it take?",
-    "session_id": "user-123"
-})
-```
-
-### Document Upload
-```python
-import requests
-
-files = {"file": open("document.pdf", "rb")}
-response = requests.post("http://localhost:8000/api/documents/upload", files=files)
-print(response.json())
-```
 
 ## Project Structure
 
 ```
 kyna/
 ├── config/
-│   └── config.yaml          # Main configuration
+│   ├── config.yaml          # Main configuration
+│   └── prompts/
+│       └── prompt.md        # RAG prompt template
 ├── data/                    # Document storage
 ├── kyna/
 │   ├── api/
@@ -217,10 +267,16 @@ kyna/
 │   │   ├── retriever.py    # Qdrant retriever
 │   │   ├── rag_chain.py    # RAG pipeline
 │   │   ├── document_processor.py  # Document processing
-│   │   └── document_manager.py    # Document metadata
+│   │   ├── document_manager.py    # Document metadata
+│   │   └── logging_config.py      # Logging configuration
 │   └── playground/
 │       └── app.py          # Streamlit UI
 ├── alembic/                # Database migrations
+├── docker-compose.yml      # Production Docker setup
+├── docker-compose.debug.yml # Debug Docker setup
+├── Dockerfile.api          # API container
+├── Dockerfile.playground   # Playground container
+├── Makefile               # Docker management commands
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -230,54 +286,56 @@ kyna/
 
 ### Database Migrations
 
-Create a new migration:
 ```bash
+# Create a new migration
 alembic revision --autogenerate -m "description"
-```
 
-Apply migrations:
-```bash
+# Apply migrations
 alembic upgrade head
 ```
 
 ### Adding New Document Types
 
-1. Update the allowed extensions in `documents.py`
-2. Add appropriate loader in `document_processor.py`
+1. Update the allowed extensions in `kyna/api/endpoints/documents.py`
+2. Add appropriate loader in `kyna/core/document_processor.py`
 3. Test with the new document type
 
 ### Customizing the RAG Pipeline
 
-1. Modify prompt templates in `config.yaml`
-2. Adjust retrieval parameters (k, score_threshold)
-3. Change embedding models or LLM providers
+1. Modify prompt templates in `config/prompts/prompt.md`
+2. Adjust retrieval parameters in `config/config.yaml`
+3. Change embedding models or LLM providers in configuration
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Qdrant Connection Error**
-- Ensure Qdrant is running on the configured host:port
-- Check firewall settings
+- Ensure Qdrant container is running: `make status`
+- Check Docker network connectivity
+- Verify Qdrant configuration in `config/config.yaml`
 
-**Import Errors**
-- Verify all dependencies are installed: `pip install -r requirements.txt`
-- Check Python version compatibility
+**Container Issues**
+- Reset all containers: `make clean && make build && make up`
+- Check container logs: `make logs`
+- Verify Docker and Docker Compose installation
 
 **Database Issues**
-- Run migrations: `alembic upgrade head`
-- Check database file permissions
+- Reset database: `make db-reset`
+- Check database permissions
+- Verify Alembic migrations
 
 **API Key Errors**
 - Verify API keys in `.env` file
-- Check LLM provider configuration
+- Check LLM provider configuration in `config/config.yaml`
+- Ensure environment variables are loaded correctly
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Test your changes with `make build && make up`
 5. Submit a pull request
 
 ## License
@@ -288,5 +346,6 @@ This project is licensed under the MIT License. See LICENSE file for details.
 
 For issues and questions:
 - Open an issue on GitHub
-- Check the documentation at `/docs` when running the API
-- Review the configuration options in `config.yaml`
+- Check the API documentation at `http://localhost:8000/docs`
+- Review the configuration options in `config/config.yaml`
+- Use `make help` to see all available commands

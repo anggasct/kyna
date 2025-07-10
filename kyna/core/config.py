@@ -1,8 +1,25 @@
+"""
+Configuration Module - Manages application settings and environment variables.
+
+This module is responsible for loading and providing access to the application's
+configuration, which is defined in a YAML file and can be augmented with
+environment variables. It uses dataclasses for type-safe configuration access.
+
+Key components:
+- Various dataclasses (`DatabaseConfig`, `QdrantConfig`, etc.) to define the
+  structure of the configuration.
+- `load_config`: Function to load the configuration from a YAML file.
+- `get_config`: Provides a singleton instance of the loaded configuration.
+
+Integration:
+- Used by almost all other core modules to access application settings.
+"""
 import os
 import yaml
 from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -57,14 +74,9 @@ class Config:
     memory: MemoryConfig
 
 def load_config(config_path: str = "config/config.yaml") -> Config:
-    """Load configuration from YAML file."""
     with open(config_path, 'r') as file:
         yaml_content = file.read()
     
-    # Simple environment variable substitution
-    import re
-    
-    # Replace ${VAR_NAME:default_value} with environment variable value or default
     def replace_env_var(match):
         var_name = match.group(1)
         default_value = match.group(2) if match.group(2) else ""
@@ -89,7 +101,6 @@ def load_config(config_path: str = "config/config.yaml") -> Config:
 _config: Optional[Config] = None
 
 def get_config() -> Config:
-    """Get singleton configuration instance."""
     global _config
     if _config is None:
         _config = load_config()
