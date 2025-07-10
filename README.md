@@ -24,7 +24,7 @@ The system follows a modular architecture:
 - **Backend**: FastAPI with Python
 - **AI Orchestration**: LangChain for RAG pipeline
 - **Vector Store**: Qdrant for document embeddings
-- **Database**: SQLAlchemy with SQLite (MVP) for metadata
+- **Database**: SQLAlchemy with PostgreSQL for metadata
 - **UI**: Streamlit playground
 - **Configuration**: YAML config files with environment variables
 - **Containerization**: Docker with production and debug configurations
@@ -118,7 +118,7 @@ The system is configured via `config/config.yaml`:
 ```yaml
 # Database Configuration
 database:
-  url: "sqlite:///kyna.db"
+  url: "${DATABASE_URL:postgresql://kyna:kyna@localhost:5432/kyna}"
 
 # Qdrant Vector Store Configuration
 qdrant:
@@ -167,6 +167,9 @@ OPENROUTER_API_KEY=sk-or-your-openrouter-api-key-here
 GROQ_API_KEY=your-groq-api-key-here
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
 
+# Database Configuration
+DATABASE_URL=postgresql://kyna:kyna@localhost:5432/kyna
+
 # Optional: Qdrant Cloud Configuration
 QDRANT_URL=https://your-qdrant-instance.com
 QDRANT_API_KEY=your-qdrant-api-key-here
@@ -201,7 +204,7 @@ make restart-debug  # Restart debug containers
 
 ```bash
 make db-reset       # Reset all database data (with confirmation)
-make db-backup      # Backup Qdrant and SQLite databases
+make db-backup      # Backup Qdrant and PostgreSQL databases
 make db-restore     # Restore from backup (specify BACKUP_TIMESTAMP)
 make db-reset-force # Force reset without confirmation
 ```
@@ -322,8 +325,9 @@ alembic upgrade head
 
 **Database Issues**
 - Reset database: `make db-reset`
-- Check database permissions
+- Check PostgreSQL connection and permissions
 - Verify Alembic migrations
+- Ensure PostgreSQL container is running
 
 **API Key Errors**
 - Verify API keys in `.env` file

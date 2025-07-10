@@ -29,10 +29,10 @@ help:
 	@echo "  make status         - Show container status"
 	@echo ""
 	@echo "Database Commands:"
-	@echo "  make db-reset       - Reset all database data (Qdrant + SQLite)"
+	@echo "  make db-reset       - Reset all database data (Qdrant + PostgreSQL)"
 	@echo "  make db-reset-prod  - Reset production database data"
 	@echo "  make db-reset-debug - Reset debug database data"
-	@echo "  make db-backup      - Backup both Qdrant and SQLite databases"
+	@echo "  make db-backup      - Backup both Qdrant and PostgreSQL databases"
 	@echo "  make db-restore     - Restore databases from backup (specify BACKUP_TIMESTAMP=YYYYMMDD_HHMMSS)"
 	@echo "  make db-reset-force - Force reset without confirmation (dangerous!)"
 	@echo ""
@@ -150,16 +150,15 @@ clean-all: clean clean-images clean-volumes
 
 db-reset:
 	@echo "Resetting all database data..."
-	@echo "This will delete ALL data in Qdrant and SQLite databases!"
+	@echo "This will delete ALL data in Qdrant and PostgreSQL databases!"
 	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
 	@echo "Stopping containers..."
 	docker-compose down
 	docker-compose -f docker-compose.debug.yml down
 	@echo "Removing Qdrant data volume..."
 	docker volume rm kyna_qdrant_data 2>/dev/null || true
-	@echo "Removing SQLite database..."
-	rm -f kyna.db kyna.db-journal kyna.db-wal 2>/dev/null || true
-	rm -f *.db *.sqlite *.sqlite3 2>/dev/null || true
+	@echo "Removing PostgreSQL database volume..."
+	docker volume rm kyna_postgres_data 2>/dev/null || true
 	@echo "Database reset completed!"
 	@echo "Run 'make up' or 'make up-debug' to start with fresh database"
 
@@ -171,9 +170,8 @@ db-reset-prod:
 	docker-compose down
 	@echo "Removing Qdrant data volume..."
 	docker volume rm kyna_qdrant_data 2>/dev/null || true
-	@echo "Removing SQLite database..."
-	rm -f kyna.db kyna.db-journal kyna.db-wal 2>/dev/null || true
-	rm -f *.db *.sqlite *.sqlite3 2>/dev/null || true
+	@echo "Removing PostgreSQL database volume..."
+	docker volume rm kyna_postgres_data 2>/dev/null || true
 	@echo "Production database reset completed!"
 	@echo "Run 'make up-prod' to start with fresh database"
 
@@ -185,9 +183,8 @@ db-reset-debug:
 	docker-compose -f docker-compose.debug.yml down
 	@echo "Removing Qdrant data volume..."
 	docker volume rm kyna_qdrant_data 2>/dev/null || true
-	@echo "Removing SQLite database..."
-	rm -f kyna.db kyna.db-journal kyna.db-wal 2>/dev/null || true
-	rm -f *.db *.sqlite *.sqlite3 2>/dev/null || true
+	@echo "Removing PostgreSQL database volume..."
+	docker volume rm kyna_postgres_data 2>/dev/null || true
 	@echo "Debug database reset completed!"
 	@echo "Run 'make up-debug' to start with fresh database"
 
@@ -198,11 +195,10 @@ db-backup:
 	echo "Backing up Qdrant database..."; \
 	docker run --rm -v kyna_qdrant_data:/source -v $(PWD)/backups:/backup alpine \
 		tar czf /backup/qdrant_backup_$$timestamp.tar.gz -C /source . 2>/dev/null || true; \
-	echo "Backing up SQLite database..."; \
-	if [ -f "kyna.db" ]; then \
-		cp kyna.db backups/kyna_backup_$$timestamp.db; \
-		echo "SQLite backup created: backups/kyna_backup_$$timestamp.db"; \
-	fi; \
+	echo "Backing up PostgreSQL database..."; \
+	docker run --rm -v kyna_postgres_data:/source -v $(PWD)/backups:/backup alpine \
+		tar czf /backup/postgres_backup_$$timestamp.tar.gz -C /source . 2>/dev/null || true; \
+	echo "PostgreSQL backup created: backups/postgres_backup_$$timestamp.tar.gz"; \
 	echo "Qdrant backup created: backups/qdrant_backup_$$timestamp.tar.gz"; \
 	echo "Backup completed with timestamp: $$timestamp"
 
@@ -214,7 +210,7 @@ db-restore:
 		ls -la backups/ 2>/dev/null | grep backup || echo "No backups found"; \
 		exit 1; \
 	fi
-	@if [ ! -f "backups/qdrant_backup_$(BACKUP_TIMESTAMP).tar.gz" ] && [ ! -f "backups/kyna_backup_$(BACKUP_TIMESTAMP).db" ]; then \
+	@if [ ! -f "backups/qdrant_backup_$(BACKUP_TIMESTAMP).tar.gz" ] && [ ! -f "backups/postgres_backup_$(BACKUP_TIMESTAMP).tar.gz" ]; then \
 		echo "No backup files found for timestamp: $(BACKUP_TIMESTAMP)"; \
 		echo "Available backups:"; \
 		ls -la backups/ 2>/dev/null | grep backup || echo "No backups found"; \
@@ -227,7 +223,7 @@ db-restore:
 	docker-compose -f docker-compose.debug.yml down
 	@echo "Removing current data..."
 	docker volume rm kyna_qdrant_data 2>/dev/null || true
-	rm -f kyna.db kyna.db-journal kyna.db-wal 2>/dev/null || true
+	docker volume rm kyna_postgres_data 2>/dev/null || true
 	@echo "Restoring from backup..."
 	@if [ -f "backups/qdrant_backup_$(BACKUP_TIMESTAMP).tar.gz" ]; then \
 		echo "Restoring Qdrant database..."; \
@@ -236,10 +232,12 @@ db-restore:
 			tar xzf /backup.tar.gz -C /target; \
 		echo "Qdrant database restored"; \
 	fi
-	@if [ -f "backups/kyna_backup_$(BACKUP_TIMESTAMP).db" ]; then \
-		echo "Restoring SQLite database..."; \
-		cp backups/kyna_backup_$(BACKUP_TIMESTAMP).db kyna.db; \
-		echo "SQLite database restored"; \
+	@if [ -f "backups/postgres_backup_$(BACKUP_TIMESTAMP).tar.gz" ]; then \
+		echo "Restoring PostgreSQL database..."; \
+		docker volume create kyna_postgres_data; \
+		docker run --rm -v kyna_postgres_data:/target -v $(PWD)/backups/postgres_backup_$(BACKUP_TIMESTAMP).tar.gz:/backup.tar.gz alpine \
+			tar xzf /backup.tar.gz -C /target; \
+		echo "PostgreSQL database restored"; \
 	fi
 	@echo "Database restoration completed!"
 	@echo "Run 'make up' or 'make up-debug' to start with restored database"
@@ -249,8 +247,7 @@ db-reset-force:
 	docker-compose down 2>/dev/null || true
 	docker-compose -f docker-compose.debug.yml down 2>/dev/null || true
 	docker volume rm kyna_qdrant_data 2>/dev/null || true
-	rm -f kyna.db kyna.db-journal kyna.db-wal 2>/dev/null || true
-	rm -f *.db *.sqlite *.sqlite3 2>/dev/null || true
+	docker volume rm kyna_postgres_data 2>/dev/null || true
 	@echo "Database force reset completed!"
 
 # =============================================================================
