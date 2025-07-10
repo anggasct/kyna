@@ -344,7 +344,7 @@ alembic upgrade head
 
 ## License
 
-This project is licensed under the MIT License. See LICENSE file for details.
+This project is licensed under the Apache License 2.0. See LICENSE file for details.
 
 ## Support
 
